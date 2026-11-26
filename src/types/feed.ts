@@ -58,15 +58,22 @@ export interface FeedComment {
   createdAt: string;
 }
 
-/** Дані, якими сервер підписує пряме завантаження відео у Cloudinary. */
-export interface FeedUploadSignature {
+/** Сервер вибирає безкоштовне сховище: Cloudinary або S3-сумісне (R2/B2). */
+export type FeedUploadSignature = {
+  provider?: 'cloudinary';
   cloudName: string;
   apiKey: string;
   timestamp: number;
   publicId: string;
   folder: string;
   signature: string;
-}
+} | {
+  provider: 's3';
+  uploadUrl: string;
+  publicUrl: string;
+  method: 'PUT';
+  expiresIn: number;
+};
 
 export interface FeedDraft {
   text: string;

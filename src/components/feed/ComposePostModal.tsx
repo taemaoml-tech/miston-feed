@@ -4,7 +4,7 @@ import type { ChangeEvent, FormEvent } from 'react';
 import { api } from '../../api';
 import { assetUrl } from '../../api/client';
 import type { FeedCategory, FeedDraft, FeedPost } from '../../types/feed';
-import { uploadFeedVideo } from '../../utils/cloudinaryUpload';
+import { uploadFeedVideo } from '../../utils/videoUpload';
 import { errorMessage, formatDuration } from '../../utils/format';
 import { Modal } from '../common/Modal';
 

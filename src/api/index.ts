@@ -75,7 +75,10 @@ export const api = {
       return request<{ posts: FeedPost[]; hasMore: boolean }>(`/feed?${params}`);
     },
     since: (after: string) => request<{ count: number }>(`/feed/since?after=${encodeURIComponent(after)}`),
-    signVideoUpload: (bytes: number) => request<FeedUploadSignature>('/feed/upload/sign', { method: 'POST', body: { bytes } }),
+    signVideoUpload: (bytes: number, fileName: string) => request<FeedUploadSignature>('/feed/upload/sign', {
+      method: 'POST',
+      body: { bytes, fileName },
+    }),
     create: (draft: FeedDraft) => {
       if (draft.image || draft.video) {
         const body = new FormData();
