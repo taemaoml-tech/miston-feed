@@ -78,11 +78,15 @@ export const api = {
     answerTheme: (answer: string) => request<{ theme: FeedTheme }>('/feed/theme', { method: 'POST', body: { answer } }),
     since: (after: string) => request<{ count: number }>(`/feed/since?after=${encodeURIComponent(after)}`),
     create: (draft: FeedDraft) => {
-      if (draft.image) {
+      if (draft.image || draft.video) {
         const body = new FormData();
         body.append('text', draft.text);
         body.append('category', draft.category);
-        body.append('image', draft.image);
+        if (draft.image) body.append('image', draft.image);
+        if (draft.video) {
+          body.append('video', draft.video);
+          if (draft.videoDuration != null) body.append('videoDuration', String(Math.round(draft.videoDuration)));
+        }
         if (draft.poll) body.append('poll', JSON.stringify(draft.poll));
         return request<{ post: FeedPost }>('/feed', { method: 'POST', body });
       }
@@ -92,6 +96,8 @@ export const api = {
           text: draft.text,
           category: draft.category,
           ...(draft.imageUrl ? { imageUrl: draft.imageUrl } : {}),
+          ...(draft.videoUrl ? { videoUrl: draft.videoUrl } : {}),
+          ...(draft.videoDuration != null ? { videoDuration: Math.round(draft.videoDuration) } : {}),
           ...(draft.poll ? { poll: draft.poll } : {}),
         },
       });

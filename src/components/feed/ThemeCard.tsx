@@ -2,7 +2,6 @@ import { Sparkles, Users } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import type { FeedTheme } from '../../types/feed';
-import { MistonMascot } from './MistonMascot';
 
 export function ThemeCard({ theme, onAnswer }: { theme: FeedTheme; onAnswer: (answer: string) => Promise<void> }) {
   const [answer, setAnswer] = useState('');
@@ -29,16 +28,14 @@ export function ThemeCard({ theme, onAnswer }: { theme: FeedTheme; onAnswer: (an
 
   return (
     <section className="ig-card ig-card--theme rounded-[26px] border p-4 sm:p-5" aria-labelledby="feed-theme-title">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="mb-2 flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-100 text-accent-700 dark:bg-accent-950/60 dark:text-accent-300"><Sparkles size={15} /></span>
-            <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-accent-700 dark:text-accent-300">Тема дня</span>
-          </div>
-          <h2 id="feed-theme-title" className="text-base font-bold leading-snug sm:text-lg">{theme.question}</h2>
-          <p className="mt-1.5 flex items-center gap-1.5 text-xs text-ios-secondary"><Users size={13} /> {theme.participants} {theme.participants === 1 ? 'людина вже відповіла' : 'людей уже відповіли'}</p>
+      <div className="min-w-0">
+        <div className="mb-2 flex items-center gap-2">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-100 text-accent-700 dark:bg-accent-950/60 dark:text-accent-300"><Sparkles size={15} /></span>
+          <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-accent-700 dark:text-accent-300">Тема дня</span>
         </div>
-        <MistonMascot hint={theme.hint} />
+        <h2 id="feed-theme-title" className="text-base font-bold leading-snug sm:text-lg">{theme.question}</h2>
+        <p className="mt-1.5 flex items-center gap-1.5 text-xs text-ios-secondary"><Users size={13} /> {theme.participants} {theme.participants === 1 ? 'людина вже відповіла' : 'людей уже відповіли'}</p>
+        {theme.hint && <p className="mt-2 text-xs leading-relaxed text-ios-secondary"><span className="mr-1 text-accent-600 dark:text-accent-400">✦</span>{theme.hint}</p>}
       </div>
 
       {theme.answer && !editing ? (

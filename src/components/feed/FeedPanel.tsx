@@ -1,4 +1,4 @@
-import { BarChart3, Bookmark, Home, LayoutGrid, LogOut, Moon, Plus, Sun, Users } from 'lucide-react';
+import { BarChart3, Bookmark, Film, LayoutGrid, LogOut, Moon, Plus, Sun, Users, Video } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../api';
@@ -16,13 +16,12 @@ import { PostCard } from './PostCard';
 import { ThemeCard } from './ThemeCard';
 import type { FeedAuthor, FeedFilter, FeedPost, FeedTheme } from '../../types/feed';
 
-/** Стрічка живе окремо від месенджера — чат відкриваємо на його сайті. */
-const MESSENGER_URL = 'https://taemaoml-tech.github.io/miston/';
-
 const filters: Array<{ value: FeedFilter; label: string; icon: LucideIcon }> = [
   { value: 'all', label: 'Усе', icon: LayoutGrid },
   { value: 'polls', label: 'Опитування', icon: BarChart3 },
   { value: 'subscriptions', label: 'Підписки', icon: Users },
+  { value: 'shorts', label: 'Короткі', icon: Film },
+  { value: 'longs', label: 'Довгі', icon: Video },
   { value: 'saved', label: 'Збережене', icon: Bookmark },
 ];
 
@@ -168,7 +167,9 @@ export function FeedPanel() {
   const emptyTitle = filter === 'saved' ? 'Ще нічого не збережено' : 'Поки що тихо';
   const emptyText = filter === 'saved'
     ? 'Натисніть закладку на будь-якому пості — він з’явиться тут. Збережене бачите тільки ви.'
-    : 'Тут з’являться пости спільноти. Можете почати першим — додайте думку, фото чи опитування.';
+    : filter === 'longs'
+      ? 'Довші за хвилину відео з’являться тільки тут. У загальній стрічці — короткі.'
+      : 'Тут з’являться пости спільноти. Можете почати першим — додайте думку, фото чи відео.';
 
   return (
     <div className="ig-shell" aria-label="Стрічка Miston">
@@ -185,9 +186,6 @@ export function FeedPanel() {
             <button type="button" className="ig-action" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Світла тема' : 'Темна тема'} title={theme === 'dark' ? 'Світла тема' : 'Темна тема'}>
               {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
             </button>
-            <a href={MESSENGER_URL} target="_blank" rel="noreferrer" className="ig-action hidden sm:flex" aria-label="Відкрити месенджер" title="Месенджер">
-              <Home size={19} />
-            </a>
             <button type="button" className="ig-action hidden sm:flex" onClick={() => void logout()} aria-label="Вийти" title="Вийти">
               <LogOut size={19} />
             </button>
@@ -243,7 +241,6 @@ export function FeedPanel() {
                     key={post.id}
                     post={post}
                     currentUserId={currentUser.id}
-                    chatUrl={MESSENGER_URL}
                     onReact={react}
                     onVote={vote}
                     onSave={save}
@@ -266,9 +263,6 @@ export function FeedPanel() {
         <button type="button" className="ig-nav-item ig-nav-item--primary" onClick={() => setComposeOpen(true)} aria-label="Новий пост">
           <span className="ig-nav-compose"><Plus size={23} /></span><span>Створити</span>
         </button>
-        <a href={MESSENGER_URL} target="_blank" rel="noreferrer" className="ig-nav-item" aria-label="Відкрити месенджер">
-          <Home size={21} /><span>Чати</span>
-        </a>
         <button type="button" className="ig-nav-item" onClick={() => void logout()} aria-label="Вийти">
           <LogOut size={21} /><span>Вийти</span>
         </button>

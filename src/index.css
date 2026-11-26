@@ -353,6 +353,24 @@ html.android.dark .ios-glass {
   max-height: 30rem;
 }
 
+.ig-video-wrap { @apply relative mt-3; }
+.ig-video {
+  @apply block w-full rounded-2xl border border-ios-separator/10 bg-black object-contain;
+  max-height: 30rem;
+}
+.ig-video-duration {
+  @apply absolute bottom-3 right-3 rounded-full bg-black/65 px-2 py-1 text-[11px] font-semibold text-white;
+}
+
+.feed-image, .feed-video {
+  @apply block w-full rounded-2xl border border-ios-separator/10;
+  max-height: 18rem;
+}
+.feed-video { @apply bg-black object-contain; }
+.feed-chip { @apply inline-flex shrink-0 items-center rounded-full px-3.5 py-2 text-xs font-semibold transition; }
+.feed-chip--active { @apply bg-ios-blue text-white shadow-glow; }
+.feed-chip--idle { @apply bg-ios-fill/10 text-ios-secondary hover:bg-ios-fill/20 hover:text-ios-label; }
+
 .ig-action {
   @apply inline-flex min-h-9 min-w-9 items-center justify-center rounded-xl px-1.5 text-ios-secondary transition;
 }
@@ -372,7 +390,7 @@ html.android.dark .ios-glass {
 .ig-post-enter, .feed-post-enter { animation: miston-rise 340ms cubic-bezier(.22,1,.36,1) both; }
 
 .ig-bottom-nav {
-  @apply absolute inset-x-0 bottom-0 z-40 grid grid-cols-4 gap-1 border-t border-ios-separator/15 px-2 pb-1.5 pt-1.5 md:hidden;
+  @apply absolute inset-x-0 bottom-0 z-40 grid grid-cols-3 gap-1 border-t border-ios-separator/15 px-2 pb-1.5 pt-1.5 md:hidden;
   background-color: rgb(var(--ios-glass) / .86);
   -webkit-backdrop-filter: blur(22px) saturate(180%);
   backdrop-filter: blur(22px) saturate(180%);
@@ -389,9 +407,6 @@ html.android.dark .ios-glass {
 
 .feed-poll-track { @apply h-2 overflow-hidden rounded-full bg-ios-fill/15; }
 .feed-poll-fill { @apply h-full rounded-full bg-ios-blue transition-[width] duration-500 ease-out; }
-.miston-mascot { animation: miston-float 3.4s ease-in-out infinite; }
-.miston-halo { animation: miston-halo 3.4s ease-in-out infinite; }
-
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }

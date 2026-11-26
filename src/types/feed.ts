@@ -1,7 +1,7 @@
 import type { StarCosmetics } from './models';
 
-/** Категорій стрічки лише три: звичайний пост, опитування й підписки. */
-export type FeedCategory = 'general' | 'polls' | 'subscriptions';
+/** Довгі відео живуть окремо: у загальній стрічці їх немає. */
+export type FeedCategory = 'general' | 'polls' | 'subscriptions' | 'shorts' | 'longs';
 export type FeedFilter = 'all' | FeedCategory | 'saved';
 
 export interface FeedAuthor {
@@ -39,6 +39,9 @@ export interface FeedPost {
   category: FeedCategory;
   text: string;
   imageUrl: string | null;
+  videoUrl: string | null;
+  /** Тривалість у секундах; понад 60 — категорія «longs». */
+  videoDuration: number | null;
   poll: FeedPoll | null;
   reactions: FeedReaction[];
   commentCount: number;
@@ -68,5 +71,9 @@ export interface FeedDraft {
   category: FeedCategory;
   image?: File | null;
   imageUrl?: string;
+  video?: File | null;
+  /** Секунди. Якщо відомо > 60, сервер поставить пост у «Довгі». */
+  videoDuration?: number | null;
+  videoUrl?: string;
   poll?: { question: string; options: string[] } | null;
 }

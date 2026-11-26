@@ -1,8 +1,8 @@
-import { Bookmark, Crown, MessageCircle, MoreHorizontal, Send, Trash2 } from 'lucide-react';
+import { Bookmark, Crown, MessageCircle, MoreHorizontal, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { assetUrl } from '../../api/client';
 import type { FeedPost } from '../../types/feed';
-import { formatConversationTime } from '../../utils/format';
+import { formatConversationTime, formatDuration } from '../../utils/format';
 import { Avatar } from '../common/Avatar';
 import { PollWidget } from './PollWidget';
 
@@ -10,6 +10,8 @@ const categoryLabels: Record<FeedPost['category'], string> = {
   general: 'Пост',
   polls: 'Опитування',
   subscriptions: 'Підписки',
+  shorts: 'Коротке відео',
+  longs: 'Довге відео',
 };
 
 const reactions = ['❤️', '🔥', '👏', '😂', '💡', '✨'];
@@ -21,12 +23,10 @@ interface PostCardProps {
   onVote: (postId: string, optionIndex: number) => Promise<void>;
   onSave: (postId: string) => Promise<void>;
   onComments: (post: FeedPost) => void;
-  /** Чат відкриваємо на сайті месенджера — стрічка тепер окремий застосунок. */
-  chatUrl?: string;
   onRemove?: (postId: string) => void;
 }
 
-export function PostCard({ post, currentUserId, onReact, onVote, onSave, onComments, chatUrl, onRemove }: PostCardProps) {
+export function PostCard({ post, currentUserId, onReact, onVote, onSave, onComments, onRemove }: PostCardProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -34,6 +34,7 @@ export function PostCard({ post, currentUserId, onReact, onVote, onSave, onComme
   const liked = post.reactions.some((reaction) => reaction.emoji === '❤️' && reaction.mine);
   const total = post.reactions.reduce((sum, reaction) => sum + reaction.count, 0);
   const image = assetUrl(post.imageUrl);
+  const video = assetUrl(post.videoUrl);
 
   async function run(action: () => Promise<void>) {
     if (busy) return;
@@ -84,6 +85,12 @@ export function PostCard({ post, currentUserId, onReact, onVote, onSave, onComme
 
       {post.text && <p className="whitespace-pre-wrap break-words px-4 pt-3 text-sm leading-relaxed text-ios-label sm:px-5">{post.text}</p>}
       {image && <img src={image} alt={post.text ? 'Зображення до поста' : 'Зображення в пості'} className="ig-image mt-3" loading="lazy" />}
+      {video && (
+        <div className="ig-video-wrap">
+          <video src={video} controls playsInline preload="metadata" className="ig-video" aria-label={post.text ? 'Відео до поста' : 'Відео в пості'} />
+          {post.videoDuration != null && <span className="ig-video-duration">{formatDuration(post.videoDuration)}</span>}
+        </div>
+      )}
       {post.poll && <div className="px-4 sm:px-5"><PollWidget poll={post.poll} onVote={(index) => onVote(post.id, index)} /></div>}
 
       <footer className="mt-3 flex items-center gap-1 px-3 pb-3 sm:px-4">
@@ -131,11 +138,6 @@ export function PostCard({ post, currentUserId, onReact, onVote, onSave, onComme
           >
             <Bookmark size={20} fill={post.saved ? 'currentColor' : 'none'} />
           </button>
-          {!isMine && chatUrl && (
-            <a href={chatUrl} target="_blank" rel="noreferrer" className="ig-action" aria-label={`Написати в месенджері: ${post.author.displayName}`} title="Написати в месенджері">
-              <Send size={19} />
-            </a>
-          )}
         </div>
       </footer>
     </article>
