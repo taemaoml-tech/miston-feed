@@ -2,8 +2,8 @@
 export function MistonMascot({ hint }: { hint: string }) {
   return (
     <div className="flex items-end gap-2" aria-label={`Підказка Miston: ${hint}`}>
-      <div className="relative hidden shrink-0 sm:block">
-        <svg className="miston-mascot h-16 w-16 drop-shadow-[0_8px_16px_rgba(0,122,255,0.28)]" viewBox="0 0 80 80" role="img" aria-hidden="true">
+      <div className="relative shrink-0">
+        <svg className="miston-mascot h-12 w-12 shrink-0 drop-shadow-[0_6px_14px_rgba(0,122,255,0.28)] sm:h-16 sm:w-16" viewBox="0 0 80 80" role="img" aria-hidden="true">
           <defs>
             <linearGradient id="miston-body" x1="0" y1="0" x2="1" y2="1">
               <stop offset="0%" stopColor="#7FC4FF" />
