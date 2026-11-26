@@ -1,5 +1,5 @@
 import type { AdminAction, AdminActionLog, AdminOverview, AdminStats, AuthResponse, BotAccount, CallInfo, ChatFolder, CleanupScope, CommunityServer, Complaint, ComplaintCategory, ComplaintStatus, Conversation, ConversationKind, E2eeBackup, E2eeStatus, FriendsOverview, IceServerConfig, LoginChallenge, LoginResult, LoginSession, Message, MessageKind, MessagePage, ModerationUser, StarCategory, StarEquipResponse, StarHistoryEntry, StarInventoryResponse, StarOverview, StarPurchaseResponse, StarRarity, StarShopResponse, SentNotification, Sticker, StickerLibrary, StickerPack, SupportRequest, SupportStatus, SupportTopic, SystemNotification, TwoFactorChallenge, User, UserProfile, UserRole } from '../types/models';
-import type { FeedComment, FeedDraft, FeedFilter, FeedPost } from '../types/feed';
+import type { FeedComment, FeedDraft, FeedFilter, FeedPost, FeedUploadSignature } from '../types/feed';
 import { request, tokenStore } from './client';
 
 export const api = {
@@ -75,14 +75,19 @@ export const api = {
       return request<{ posts: FeedPost[]; hasMore: boolean }>(`/feed?${params}`);
     },
     since: (after: string) => request<{ count: number }>(`/feed/since?after=${encodeURIComponent(after)}`),
+    signVideoUpload: (bytes: number) => request<FeedUploadSignature>('/feed/upload/sign', { method: 'POST', body: { bytes } }),
     create: (draft: FeedDraft) => {
       if (draft.image || draft.video) {
         const body = new FormData();
         body.append('text', draft.text);
         body.append('category', draft.category);
         if (draft.image) body.append('image', draft.image);
+        else if (draft.imageUrl) body.append('imageUrl', draft.imageUrl);
         if (draft.video) {
           body.append('video', draft.video);
+          if (draft.videoDuration != null) body.append('videoDuration', String(Math.round(draft.videoDuration)));
+        } else if (draft.videoUrl) {
+          body.append('videoUrl', draft.videoUrl);
           if (draft.videoDuration != null) body.append('videoDuration', String(Math.round(draft.videoDuration)));
         }
         if (draft.poll) body.append('poll', JSON.stringify(draft.poll));

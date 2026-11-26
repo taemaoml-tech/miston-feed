@@ -4,6 +4,7 @@ import type { ChangeEvent, FormEvent } from 'react';
 import { api } from '../../api';
 import { assetUrl } from '../../api/client';
 import type { FeedCategory, FeedDraft, FeedPost } from '../../types/feed';
+import { uploadFeedVideo } from '../../utils/cloudinaryUpload';
 import { errorMessage, formatDuration } from '../../utils/format';
 import { Modal } from '../common/Modal';
 
@@ -13,7 +14,9 @@ const categories: Array<{ value: FeedCategory; label: string }> = [
   { value: 'subscriptions', label: 'Підписки' },
 ];
 
-const MAX_MEDIA_BYTES = 25 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
+const DIRECT_UPLOAD_THRESHOLD = 25 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 2 * 1024 * 1024 * 1024;
 const SHORT_VIDEO_MAX_SECONDS = 60;
 
 export function ComposePostModal({ open, onClose, onCreated, initialCategory = 'general' }: {
@@ -34,6 +37,7 @@ export function ComposePostModal({ open, onClose, onCreated, initialCategory = '
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState(['', '']);
   const [busy, setBusy] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -49,6 +53,7 @@ export function ComposePostModal({ open, onClose, onCreated, initialCategory = '
     setPollEnabled(initialCategory === 'polls');
     setQuestion('');
     setOptions(['', '']);
+    setUploadProgress(null);
     setError('');
   }, [open, initialCategory]);
 
@@ -73,7 +78,7 @@ export function ComposePostModal({ open, onClose, onCreated, initialCategory = '
     const file = event.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) { setError('Можна додати лише зображення.'); return; }
-    if (file.size > MAX_MEDIA_BYTES) { setError('Зображення має бути не більше 25 МБ.'); return; }
+    if (file.size > MAX_IMAGE_BYTES) { setError('Зображення має бути не більше 25 МБ.'); return; }
     clearVideo();
     clearImage();
     setImage(file);
@@ -87,7 +92,7 @@ export function ComposePostModal({ open, onClose, onCreated, initialCategory = '
     if (!file) return;
     const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov)$/i.test(file.name);
     if (!isVideo) { setError('Можна додати лише відео MP4, WebM або MOV.'); return; }
-    if (file.size > MAX_MEDIA_BYTES) { setError('Відео має бути не більше 25 МБ.'); return; }
+    if (file.size > MAX_VIDEO_BYTES) { setError('Відео має бути не більше 2 ГБ.'); return; }
 
     clearImage();
     clearVideo();
@@ -142,11 +147,16 @@ export function ComposePostModal({ open, onClose, onCreated, initialCategory = '
       poll,
     };
     try {
+      if (video && video.size > DIRECT_UPLOAD_THRESHOLD) {
+        setUploadProgress(0);
+        draft.videoUrl = await uploadFeedVideo(video, (fraction) => setUploadProgress(fraction));
+        draft.video = null;
+      }
       const { post } = await api.feed.create(draft);
       onCreated(post);
       onClose();
     } catch (cause) { setError(errorMessage(cause)); }
-    finally { setBusy(false); }
+    finally { setBusy(false); setUploadProgress(null); }
   }
 
   const preview = imagePreview ? assetUrl(imagePreview) : null;
@@ -203,7 +213,9 @@ export function ComposePostModal({ open, onClose, onCreated, initialCategory = '
               <video src={videoPreview} controls playsInline preload="metadata" className="feed-video" aria-label="Попередній перегляд відео" />
               <button type="button" onClick={clearVideo} className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-white" aria-label="Прибрати відео"><X size={16} /></button>
             </div>
-            <p className="mt-2 text-[11px] text-ios-secondary" aria-live="polite">{videoHint}</p>
+            <p className="mt-2 text-[11px] text-ios-secondary" aria-live="polite">
+              {videoHint}{video && video.size > DIRECT_UPLOAD_THRESHOLD ? ' · велике відео завантажується шматками' : ''}
+            </p>
           </div>
         )}
 
@@ -224,6 +236,18 @@ export function ComposePostModal({ open, onClose, onCreated, initialCategory = '
               ))}
             </div>
             {options.length < 5 && <button type="button" className="mt-2 flex items-center gap-1 text-xs font-semibold text-ios-blue" onClick={() => setOptions((current) => [...current, ''])}><Plus size={14} /> Додати варіант</button>}
+          </div>
+        )}
+
+        {uploadProgress !== null && (
+          <div className="mt-3" aria-live="polite">
+            <div className="flex justify-between text-[11px] text-ios-secondary">
+              <span>Завантажуємо відео…</span>
+              <span>{Math.round(uploadProgress * 100)}%</span>
+            </div>
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+              <div className="h-full rounded-full bg-ios-blue transition-all" style={{ width: `${Math.round(uploadProgress * 100)}%` }} />
+            </div>
           </div>
         )}
 

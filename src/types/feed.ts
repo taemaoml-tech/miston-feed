@@ -58,6 +58,16 @@ export interface FeedComment {
   createdAt: string;
 }
 
+/** Дані, якими сервер підписує пряме завантаження відео у Cloudinary. */
+export interface FeedUploadSignature {
+  cloudName: string;
+  apiKey: string;
+  timestamp: number;
+  publicId: string;
+  folder: string;
+  signature: string;
+}
+
 export interface FeedDraft {
   text: string;
   category: FeedCategory;
