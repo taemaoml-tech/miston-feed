@@ -58,14 +58,6 @@ export interface FeedComment {
   createdAt: string;
 }
 
-export interface FeedTheme {
-  day: string;
-  question: string;
-  hint: string;
-  answer: string | null;
-  participants: number;
-}
-
 export interface FeedDraft {
   text: string;
   category: FeedCategory;

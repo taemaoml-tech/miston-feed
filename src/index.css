@@ -338,10 +338,6 @@ html.android.dark .ios-glass {
   border-color: rgb(var(--ios-separator) / .28);
 }
 .ig-card:hover { border-color: rgb(var(--ios-blue) / .22); }
-.ig-card--theme {
-  background-image: radial-gradient(120% 120% at 0% 0%, rgb(var(--accent-400) / .16), transparent 60%),
-    radial-gradient(100% 100% at 100% 100%, rgb(var(--ios-blue) / .14), transparent 55%);
-}
 
 .ig-avatar-ring {
   @apply inline-flex shrink-0 rounded-full p-[2px];

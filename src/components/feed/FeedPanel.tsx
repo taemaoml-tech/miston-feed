@@ -13,8 +13,7 @@ import { Logo } from '../common/Logo';
 import { CommentsModal } from './CommentsModal';
 import { ComposePostModal } from './ComposePostModal';
 import { PostCard } from './PostCard';
-import { ThemeCard } from './ThemeCard';
-import type { FeedAuthor, FeedFilter, FeedPost, FeedTheme } from '../../types/feed';
+import type { FeedAuthor, FeedFilter, FeedPost } from '../../types/feed';
 
 const filters: Array<{ value: FeedFilter; label: string; icon: LucideIcon }> = [
   { value: 'all', label: 'Усе', icon: LayoutGrid },
@@ -31,7 +30,6 @@ export function FeedPanel() {
   const { socket } = useSocket();
   const [filter, setFilter] = useState<FeedFilter>('all');
   const [posts, setPosts] = useState<FeedPost[]>([]);
-  const [themeOfDay, setThemeOfDay] = useState<FeedTheme | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
@@ -68,7 +66,6 @@ export function FeedPanel() {
         setPosts((current) => [...current, ...result.posts.filter((post) => !current.some((item) => item.id === post.id))]);
       } else {
         setPosts(result.posts);
-        setThemeOfDay(result.theme);
         loadedAtRef.current = new Date(Date.now() - 5000).toISOString();
         setFresh(false);
       }
@@ -151,11 +148,6 @@ export function FeedPanel() {
     else updatePost(post);
   }
 
-  async function answerTheme(answer: string) {
-    const { theme: updated } = await api.feed.answerTheme(answer);
-    setThemeOfDay(updated);
-  }
-
   async function removePost(postId: string) {
     try {
       await api.feed.remove(postId);
@@ -228,7 +220,6 @@ export function FeedPanel() {
             </div>
           ) : (
             <>
-              {filter === 'all' && themeOfDay && <ThemeCard theme={themeOfDay} onAnswer={answerTheme} />}
               {posts.length === 0 ? (
                 <div className="ig-card rounded-[26px] border">
                   <EmptyState icon={filter === 'saved' ? Bookmark : LayoutGrid} title={emptyTitle} description={emptyText} action={filter === 'saved'

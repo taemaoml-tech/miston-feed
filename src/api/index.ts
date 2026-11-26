@@ -1,5 +1,5 @@
 import type { AdminAction, AdminActionLog, AdminOverview, AdminStats, AuthResponse, BotAccount, CallInfo, ChatFolder, CleanupScope, CommunityServer, Complaint, ComplaintCategory, ComplaintStatus, Conversation, ConversationKind, E2eeBackup, E2eeStatus, FriendsOverview, IceServerConfig, LoginChallenge, LoginResult, LoginSession, Message, MessageKind, MessagePage, ModerationUser, StarCategory, StarEquipResponse, StarHistoryEntry, StarInventoryResponse, StarOverview, StarPurchaseResponse, StarRarity, StarShopResponse, SentNotification, Sticker, StickerLibrary, StickerPack, SupportRequest, SupportStatus, SupportTopic, SystemNotification, TwoFactorChallenge, User, UserProfile, UserRole } from '../types/models';
-import type { FeedComment, FeedDraft, FeedFilter, FeedPost, FeedTheme } from '../types/feed';
+import type { FeedComment, FeedDraft, FeedFilter, FeedPost } from '../types/feed';
 import { request, tokenStore } from './client';
 
 export const api = {
@@ -72,10 +72,8 @@ export const api = {
       if (filter === 'saved') params.set('saved', '1');
       else if (filter !== 'all') params.set('category', filter);
       if (before) params.set('before', before);
-      return request<{ posts: FeedPost[]; hasMore: boolean; theme: FeedTheme | null }>(`/feed?${params}`);
+      return request<{ posts: FeedPost[]; hasMore: boolean }>(`/feed?${params}`);
     },
-    theme: () => request<{ theme: FeedTheme }>('/feed/theme'),
-    answerTheme: (answer: string) => request<{ theme: FeedTheme }>('/feed/theme', { method: 'POST', body: { answer } }),
     since: (after: string) => request<{ count: number }>(`/feed/since?after=${encodeURIComponent(after)}`),
     create: (draft: FeedDraft) => {
       if (draft.image || draft.video) {
