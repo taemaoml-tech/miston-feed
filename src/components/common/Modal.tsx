@@ -1,0 +1,62 @@
+import { X } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import type { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+
+interface ModalProps {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  description?: string;
+  children: ReactNode;
+  wide?: boolean;
+  full?: boolean;
+}
+
+export function Modal({ open, onClose, title, description, children, wide = false, full = false }: ModalProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const timer = window.setTimeout(() => {
+      panelRef.current?.querySelector<HTMLElement>('input, textarea, select, button')?.focus();
+    }, 30);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+      if (event.key !== 'Tab' || !panelRef.current) return;
+      const focusable = Array.from(panelRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex="0"]'));
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.clearTimeout(timer);
+      document.body.style.overflow = originalOverflow;
+      document.removeEventListener('keydown', onKeyDown);
+      previous?.focus();
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+  return createPortal(
+    <div className="overlay-safe fixed inset-0 z-50 flex items-end justify-center bg-black/35 p-0 backdrop-blur-md animate-fade-in sm:items-center sm:p-5" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="modal-title" className={`ios-glass flex max-h-full w-full flex-col overflow-hidden rounded-t-[28px] border shadow-2xl animate-slide-up sm:rounded-[28px] ${full ? 'sm:max-w-6xl' : wide ? 'sm:max-w-3xl' : 'sm:max-w-md'}`}>
+        <div className="flex shrink-0 items-start justify-between border-b border-ios-separator/10 px-5 py-4 sm:px-6">
+          <div>
+            <h2 id="modal-title" className="text-lg font-bold tracking-tight">{title}</h2>
+            {description && <p className="mt-1 text-sm text-ios-secondary">{description}</p>}
+          </div>
+          <button type="button" className="icon-btn -mr-2 -mt-1" onClick={onClose} aria-label="Закрити діалог"><X size={20} /></button>
+        </div>
+        <div className="subtle-scrollbar min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">{children}</div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
