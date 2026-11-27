@@ -7,6 +7,7 @@ import { SESSION_NOTICE_KEY, useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { infoHref } from '../../router/infoRoute';
 import { errorMessage } from '../../utils/format';
+import { signInWithGoogle } from '../../utils/firebase';
 import { INFO_LINKS } from '../info/infoLinks';
 import { AppDownload } from '../common/AppDownload';
 import { Logo, Mark } from '../common/Logo';
@@ -28,6 +29,7 @@ export function AuthPage() {
   const [savedAccount, setSavedAccount] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const [qrInput, setQrInput] = useState('');
   const [qrSession, setQrSession] = useState<QrSession | null>(null);
@@ -177,12 +179,25 @@ export function AuthPage() {
     }
   }
 
+  /** Google-акаунт підтверджується сервером і обмінюється на звичайну сесію Miston. */
+  async function signInGoogle() {
+    setError('');
+    setGoogleLoading(true);
+    try {
+      applySession(await api.auth.google(await signInWithGoogle()));
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setGoogleLoading(false);
+    }
+  }
+
   const title = mode === 'qr' ? 'Увійти за QR-кодом' : mode === 'login' ? 'Увійти з Mist ID' : 'Створіть Mist ID';
   const subtitle = mode === 'qr'
     ? 'Покажіть цей код на телефоні у Miston — вхід відбудеться без пароля.'
     : mode === 'login'
       ? 'Ваш Mist ID — це адреса для входу та пошти в Miston.'
-      : 'Одна адреса для чатів, друзів і пошти Mist ID.';
+      : 'Реєстрація лише за поштою й паролем — без номера телефону. Або увійдіть через Google.';
   const errorBlock = error ? (
     <div role="alert" className="ios-glass rounded-2xl border border-rose-500/25 px-3.5 py-3 text-sm text-rose-600 dark:text-rose-300">{error}</div>
   ) : null;
@@ -320,7 +335,7 @@ export function AuthPage() {
                       <label className="block"><span className="field-label">Ім'я користувача</span><input className="text-input" autoComplete="username" required minLength={3} pattern="[a-zA-Z0-9_]+" value={form.username} onChange={(e) => update('username', e.target.value)} placeholder="olena" /><span className="mt-1 block text-[11px] text-ios-secondary">Ваш Mist ID: <b className="text-ios-blue">{form.username || 'username'}@mist.id</b></span></label>
                       <label className="block"><span className="field-label">Електронна пошта</span><input className="text-input" type="email" autoComplete="email" required value={form.email} onChange={(e) => update('email', e.target.value)} placeholder="olena@mail.com" /></label>
                     </div>
-                    <label className="block"><span className="field-label">Номер телефону</span><input className="text-input" type="tel" autoComplete="tel" required minLength={8} maxLength={30} value={form.phone} onChange={(e) => update('phone', e.target.value)} placeholder="+380 50 123 45 67" /><span className="mt-1 block text-[11px] text-ios-secondary">Надішлемо 8-значний код підтвердження через SMS.</span></label>
+                    <label className="block"><span className="field-label">Номер телефону <span className="font-normal text-ios-secondary">(необов’язково)</span></span><input className="text-input" type="tel" autoComplete="tel" minLength={8} maxLength={30} value={form.phone} onChange={(e) => update('phone', e.target.value)} placeholder="+380 50 123 45 67" /><span className="mt-1 block text-[11px] text-ios-secondary">Потрібен лише для підтвердження входу кодом із SMS.</span></label>
                   </>
                 )}
                 <label className="block"><span className="field-label">Пароль</span><span className="relative block"><input className="text-input pr-11" type={showPassword ? 'text' : 'password'} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} required minLength={8} value={form.password} onChange={(e) => update('password', e.target.value)} placeholder="Щонайменше 8 символів" /><button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-1 top-1 flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200" aria-label={showPassword ? 'Приховати пароль' : 'Показати пароль'}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></span></label>
@@ -330,6 +345,24 @@ export function AuthPage() {
                   {loading ? <Spinner label={mode === 'login' ? 'Вхід…' : 'Створення акаунта…'} className="text-white" /> : <>{mode === 'login' ? 'Увійти до Miston' : 'Створити Mist ID'}<ArrowRight size={17} /></>}
                 </button>
               </form>
+            )}
+            {mode !== 'qr' && (
+              <>
+                <div className="my-5 flex items-center gap-3" aria-hidden="true">
+                  <span className="h-px flex-1 bg-ios-separator/20" />
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-ios-secondary">або</span>
+                  <span className="h-px flex-1 bg-ios-separator/20" />
+                </div>
+                <button type="button" onClick={() => void signInGoogle()} disabled={googleLoading || loading} className="secondary-btn flex w-full justify-center gap-2.5 py-3" aria-label={mode === 'login' ? 'Увійти через Google' : 'Зареєструватися через Google'}>
+                  <svg viewBox="0 0 18 18" width="17" height="17" aria-hidden="true">
+                    <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.71-1.57 2.68-3.88 2.68-6.62z" />
+                    <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.34A9 9 0 0 0 9 18z" />
+                    <path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.94H.96a9 9 0 0 0 0 8.12l3.01-2.34z" />
+                    <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.43 1.35l2.58-2.58C13.47.89 11.43 0 9 0A9 9 0 0 0 .96 4.94l3.01 2.34C4.68 5.16 6.66 3.58 9 3.58z" />
+                  </svg>
+                  {googleLoading ? 'Підключаємо…' : mode === 'login' ? 'Увійти через Google' : 'Зареєструватися через Google'}
+                </button>
+              </>
             )}
             <p className="mt-4 flex items-center justify-center gap-1.5 text-[11px] text-ios-secondary"><Mail size={13} /> Пошта Mist ID доступна у профілі після входу.</p>
             <div className="mt-4 flex items-center justify-center gap-2 text-xs text-ios-secondary"><LockKeyhole size={13} /> Ваша сесія безпечно зберігається на цьому пристрої</div>

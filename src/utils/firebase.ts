@@ -1,4 +1,5 @@
 import { getApps, initializeApp } from 'firebase/app';
+import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { getMessaging, getToken, isSupported, onMessage } from 'firebase/messaging';
 import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 
@@ -90,6 +91,19 @@ export async function getNativeFcmToken(): Promise<string | null> {
     console.warn('Native FCM token error', error);
     return null;
   }
+}
+
+/** Google-вхід: повертає ID-токен, який сервер обмінює на сесію Miston. */
+export async function signInWithGoogle(): Promise<string> {
+  if (!config.apiKey || !config.authDomain || !config.projectId || !config.appId) {
+    throw new Error('Google-вхід ще не налаштовано для цього сайту.');
+  }
+  const app = getApps().length ? getApps()[0]! : initializeApp(config);
+  const auth = getAuth(app);
+  const result = await signInWithPopup(auth, new GoogleAuthProvider());
+  const token = await result.user.getIdToken(true);
+  if (!token) throw new Error('Не вдалося отримати Google-токен.');
+  return token;
 }
 
 /**

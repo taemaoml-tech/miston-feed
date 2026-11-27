@@ -6,6 +6,7 @@ export const api = {
   auth: {
     login: (identifier: string, password: string) => request<LoginResult>('/auth/login', { method: 'POST', body: { identifier, password }, auth: false }),
     register: (email: string, username: string, displayName: string, password: string, phone?: string) => request<AuthResponse>('/auth/register', { method: 'POST', body: { email, username, displayName, password, ...(phone ? { phone } : {}) }, auth: false }),
+    google: (idToken: string) => request<AuthResponse>('/auth/google', { method: 'POST', body: { idToken }, auth: false }),
     loginVerify: (challengeId: string, code: string) => request<AuthResponse | TwoFactorChallenge>('/auth/login/verify', { method: 'POST', body: { challengeId, code }, auth: false }),
     login2fa: (token: string, password: string) => request<AuthResponse>('/auth/login/2fa', { method: 'POST', body: { token, password }, auth: false }),
     loginResend: (challengeId: string) => request<LoginChallenge>('/auth/login/resend', { method: 'POST', body: { challengeId }, auth: false }),
@@ -80,18 +81,28 @@ export const api = {
       body: { bytes, fileName },
     }),
     create: (draft: FeedDraft) => {
-      if (draft.image || draft.video) {
+      const items = draft.media?.length ? draft.media : [
+        ...(draft.image ? [{ type: 'image' as const, url: draft.imageUrl ?? '', file: draft.image }] : []),
+        ...(draft.video ? [{ type: 'video' as const, url: draft.videoUrl ?? '', file: draft.video, duration: draft.videoDuration }] : []),
+      ];
+      const hasFiles = items.some((item) => item.file);
+      if (hasFiles || items.length > 0) {
         const body = new FormData();
         body.append('text', draft.text);
         body.append('category', draft.category);
-        if (draft.image) body.append('image', draft.image);
-        else if (draft.imageUrl) body.append('imageUrl', draft.imageUrl);
-        if (draft.video) {
-          body.append('video', draft.video);
-          if (draft.videoDuration != null) body.append('videoDuration', String(Math.round(draft.videoDuration)));
-        } else if (draft.videoUrl) {
-          body.append('videoUrl', draft.videoUrl);
-          if (draft.videoDuration != null) body.append('videoDuration', String(Math.round(draft.videoDuration)));
+        for (const item of items) {
+          if (item.file) {
+            body.append('mediaFile', item.file);
+          } else if (item.url) {
+            body.append('mediaItem', JSON.stringify({
+              type: item.type,
+              url: item.url,
+              ...(item.type === 'video' && item.duration != null ? { duration: Math.round(item.duration) } : {}),
+            }));
+          }
+        }
+        if (draft.videoDuration != null && !items.some((item) => item.type === 'video' && item.duration != null)) {
+          body.append('videoDuration', String(Math.round(draft.videoDuration)));
         }
         if (draft.poll) body.append('poll', JSON.stringify(draft.poll));
         return request<{ post: FeedPost }>('/feed', { method: 'POST', body });
@@ -101,9 +112,6 @@ export const api = {
         body: {
           text: draft.text,
           category: draft.category,
-          ...(draft.imageUrl ? { imageUrl: draft.imageUrl } : {}),
-          ...(draft.videoUrl ? { videoUrl: draft.videoUrl } : {}),
-          ...(draft.videoDuration != null ? { videoDuration: Math.round(draft.videoDuration) } : {}),
           ...(draft.poll ? { poll: draft.poll } : {}),
         },
       });

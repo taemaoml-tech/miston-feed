@@ -1,4 +1,4 @@
-import { Bell, Bookmark, Check, Eraser, Flag, Folder, LayoutGrid, LoaderCircle, LogOut, Menu, MessageSquarePlus, MoreVertical, Search, Trash2, Users, X } from 'lucide-react';
+import { ArrowLeft, Bell, Bookmark, Check, Eraser, Flag, Folder, LayoutGrid, LoaderCircle, LogOut, Menu, MessageSquarePlus, MoreVertical, Search, Trash2, Users, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -34,13 +34,15 @@ interface RowMenu {
   y: number;
 }
 
-export function ConversationSidebar({ onNewChat, onProfile, onOpenMenu, onOpenUser, onAction, onReportUser }: {
+export function ConversationSidebar({ onNewChat, onProfile, onOpenMenu, onOpenUser, onAction, onReportUser, compact = false, onBack }: {
   onNewChat: () => void;
   onProfile: () => void;
   onOpenMenu: () => void;
   onOpenUser: (id: string) => void;
   onAction: (conversation: Conversation, action: ConversationAction) => void;
   onReportUser: (userId: string) => void;
+  compact?: boolean;
+  onBack?: () => void;
 }) {
   const { user } = useAuth();
   const { conversations, activeConversation, selectConversation, loading, error, reload, presence, systemUnread, savedNotes, openSavedNotes } = useMessenger();
@@ -96,14 +98,25 @@ export function ConversationSidebar({ onNewChat, onProfile, onOpenMenu, onOpenUs
     <aside className="relative flex h-full min-w-0 flex-1 flex-col border-r border-ios-separator/10 bg-ios-glass/80 backdrop-blur-xl md:w-80 md:flex-none lg:w-[340px]" aria-label="Розмови та друзі">
       <div className="flex h-14 shrink-0 items-center justify-between gap-1 px-2 sm:px-3">
         <div className="flex min-w-0 items-center gap-1">
-          <button type="button" className="icon-btn md:hidden" onClick={onOpenMenu} aria-label="Відкрити меню"><Menu size={20} /></button>
-          <span className="sm:hidden"><Logo compact size={30} /></span>
-          <span className="hidden sm:block"><Logo size={32} /></span>
+          {compact ? (
+            <>
+              {onBack && <button type="button" className="icon-btn" onClick={onBack} aria-label="Назад до стрічки"><ArrowLeft size={19} /></button>}
+              <h2 className="truncate px-1 text-sm font-bold">Повідомлення</h2>
+            </>
+          ) : (
+            <>
+              <button type="button" className="icon-btn md:hidden" onClick={onOpenMenu} aria-label="Відкрити меню"><Menu size={20} /></button>
+              <span className="sm:hidden"><Logo compact size={30} /></span>
+              <span className="hidden sm:block"><Logo size={32} /></span>
+            </>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-0.5">
-          <a href={FEED_URL} target="_blank" rel="noreferrer" className="icon-btn relative" aria-label="Стрічка (окремий сайт)" title="Стрічка">
-            <LayoutGrid size={20} />
-          </a>
+          {!compact && (
+            <a href={FEED_URL} target="_blank" rel="noreferrer" className="icon-btn relative" aria-label="Стрічка (окремий сайт)" title="Стрічка">
+              <LayoutGrid size={20} />
+            </a>
+          )}
           <button type="button" className={`icon-btn relative ${tab === 'friends' ? 'bg-ios-blue/10 text-ios-blue' : ''}`} onClick={() => setTab((current) => current === 'friends' ? 'chats' : 'friends')} aria-label="Друзі" aria-pressed={tab === 'friends'}>
             <Users size={20} />
             {incomingCount > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-ios-blue px-1 text-[9px] font-bold text-white">{incomingCount > 9 ? '9+' : incomingCount}</span>}

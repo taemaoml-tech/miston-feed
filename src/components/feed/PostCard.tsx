@@ -1,7 +1,7 @@
-import { Bookmark, Crown, MessageCircle, MoreHorizontal, Trash2 } from 'lucide-react';
+import { Bookmark, ChevronLeft, ChevronRight, Crown, MessageCircle, MoreHorizontal, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { assetUrl } from '../../api/client';
-import type { FeedPost } from '../../types/feed';
+import type { FeedMedia, FeedPost } from '../../types/feed';
 import { formatConversationTime, formatDuration } from '../../utils/format';
 import { Avatar } from '../common/Avatar';
 import { PollWidget } from './PollWidget';
@@ -15,6 +15,14 @@ const categoryLabels: Record<FeedPost['category'], string> = {
 };
 
 const reactions = ['❤️', '🔥', '👏', '😂', '💡', '✨'];
+
+function mediaFor(post: FeedPost): FeedMedia[] {
+  if (post.media?.length) return post.media;
+  const legacy: FeedMedia[] = [];
+  if (post.imageUrl) legacy.push({ type: 'image', url: post.imageUrl });
+  if (post.videoUrl) legacy.push({ type: 'video', url: post.videoUrl, duration: post.videoDuration });
+  return legacy;
+}
 
 interface PostCardProps {
   post: FeedPost;
@@ -30,17 +38,24 @@ export function PostCard({ post, currentUserId, onReact, onVote, onSave, onComme
   const [pickerOpen, setPickerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [mediaIndex, setMediaIndex] = useState(0);
   const isMine = post.author.id === currentUserId;
   const liked = post.reactions.some((reaction) => reaction.emoji === '❤️' && reaction.mine);
   const total = post.reactions.reduce((sum, reaction) => sum + reaction.count, 0);
-  const image = assetUrl(post.imageUrl);
-  const video = assetUrl(post.videoUrl);
+  const media = mediaFor(post);
+  const active = media[Math.min(mediaIndex, media.length - 1)];
+  const activeUrl = active ? assetUrl(active.url) : null;
 
   async function run(action: () => Promise<void>) {
     if (busy) return;
     setBusy(true);
     try { await action(); }
     finally { setBusy(false); }
+  }
+
+  function step(delta: number) {
+    if (media.length < 2) return;
+    setMediaIndex((current) => (current + delta + media.length) % media.length);
   }
 
   return (
@@ -84,13 +99,30 @@ export function PostCard({ post, currentUserId, onReact, onVote, onSave, onComme
       </header>
 
       {post.text && <p className="whitespace-pre-wrap break-words px-4 pt-3 text-sm leading-relaxed text-ios-label sm:px-5">{post.text}</p>}
-      {image && <img src={image} alt={post.text ? 'Зображення до поста' : 'Зображення в пості'} className="ig-image mt-3" loading="lazy" />}
-      {video && (
-        <div className="ig-video-wrap">
-          <video src={video} controls playsInline preload="metadata" className="ig-video" aria-label={post.text ? 'Відео до поста' : 'Відео в пості'} />
-          {post.videoDuration != null && <span className="ig-video-duration">{formatDuration(post.videoDuration)}</span>}
+
+      {activeUrl && (
+        <div className="ig-media-stage mt-3">
+          {active?.type === 'video' ? (
+            <div className="ig-video-wrap">
+              <video src={activeUrl} controls playsInline preload="metadata" className="ig-video" aria-label={post.text ? 'Відео до поста' : 'Відео в пості'} />
+              {active.duration != null && <span className="ig-video-duration">{formatDuration(active.duration)}</span>}
+            </div>
+          ) : (
+            <img src={activeUrl} alt={post.text ? 'Зображення до поста' : 'Зображення в пості'} className="ig-image" loading="lazy" />
+          )}
+          {media.length > 1 && (
+            <>
+              <button type="button" className="ig-media-arrow ig-media-arrow--left" onClick={() => step(-1)} aria-label="Попереднє медіа"><ChevronLeft size={20} /></button>
+              <button type="button" className="ig-media-arrow ig-media-arrow--right" onClick={() => step(1)} aria-label="Наступне медіа"><ChevronRight size={20} /></button>
+              <span className="ig-media-count">{Math.min(mediaIndex, media.length - 1) + 1} / {media.length}</span>
+              <div className="ig-media-dots" aria-hidden="true">
+                {media.map((item, index) => <span key={`${item.url}-${index}`} className={index === Math.min(mediaIndex, media.length - 1) ? 'is-active' : ''} />)}
+              </div>
+            </>
+          )}
         </div>
       )}
+
       {post.poll && <div className="px-4 sm:px-5"><PollWidget poll={post.poll} onVote={(index) => onVote(post.id, index)} /></div>}
 
       <footer className="mt-3 flex items-center gap-1 px-3 pb-3 sm:px-4">

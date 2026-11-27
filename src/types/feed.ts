@@ -33,11 +33,20 @@ export interface FeedPoll {
   myVote: number | null;
 }
 
+/** Один вкладення поста: фото або відео з тривалістю в секундах. */
+export interface FeedMedia {
+  type: 'image' | 'video';
+  url: string;
+  duration?: number | null;
+}
+
 export interface FeedPost {
   id: string;
   author: FeedAuthor;
   category: FeedCategory;
   text: string;
+  /** Усі медіа поста. Старі пости мають порожній масив і читаються з imageUrl/videoUrl. */
+  media: FeedMedia[];
   imageUrl: string | null;
   videoUrl: string | null;
   /** Тривалість у секундах; понад 60 — категорія «longs». */
@@ -75,9 +84,17 @@ export type FeedUploadSignature = {
   expiresIn: number;
 };
 
+/** Локальне вкладення в момент складання поста. */
+export interface FeedMediaDraft extends FeedMedia {
+  file?: File | null;
+}
+
 export interface FeedDraft {
   text: string;
   category: FeedCategory;
+  /** Файли до 25 МБ і вже завантажені великі відео — все в одному масиві. */
+  media?: FeedMediaDraft[];
+  /** Legacy-поля для сумісності зі старим API. */
   image?: File | null;
   imageUrl?: string;
   video?: File | null;

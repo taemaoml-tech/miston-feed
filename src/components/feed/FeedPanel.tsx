@@ -1,5 +1,4 @@
-import { BarChart3, Bookmark, Film, LayoutGrid, LogOut, Moon, Plus, Sun, Users, Video } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { Bookmark, LayoutGrid, LogOut, MessageCircle, Moon, Plus, Sun } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -12,23 +11,17 @@ import { Spinner } from '../common/Spinner';
 import { Logo } from '../common/Logo';
 import { CommentsModal } from './CommentsModal';
 import { ComposePostModal } from './ComposePostModal';
+import { FeedDmView } from './FeedDmView';
+import { FeedSidebar } from './FeedSidebar';
 import { PostCard } from './PostCard';
 import type { FeedAuthor, FeedFilter, FeedPost } from '../../types/feed';
-
-const filters: Array<{ value: FeedFilter; label: string; icon: LucideIcon }> = [
-  { value: 'all', label: 'Усе', icon: LayoutGrid },
-  { value: 'polls', label: 'Опитування', icon: BarChart3 },
-  { value: 'subscriptions', label: 'Підписки', icon: Users },
-  { value: 'shorts', label: 'Короткі', icon: Film },
-  { value: 'longs', label: 'Довгі', icon: Video },
-  { value: 'saved', label: 'Збережене', icon: Bookmark },
-];
 
 export function FeedPanel() {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { socket } = useSocket();
   const [filter, setFilter] = useState<FeedFilter>('all');
+  const [chatOpen, setChatOpen] = useState(false);
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -116,6 +109,10 @@ export function FeedPanel() {
   }, [hasMore, loading, filter, posts, load]);
 
   useAndroidBack(() => {
+    if (chatOpen) { setChatOpen(false); return true; }
+    return false;
+  }, 150);
+  useAndroidBack(() => {
     if (commentsPost) { setCommentsPost(null); return true; }
     if (composeOpen) { setComposeOpen(false); return true; }
     if (fresh) { setFresh(false); return true; }
@@ -125,6 +122,11 @@ export function FeedPanel() {
   function refresh() {
     void load(filter);
     scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function selectFilter(next: FeedFilter) {
+    setChatOpen(false);
+    setFilter(next);
   }
 
   function updatePost(updated: FeedPost) {
@@ -165,97 +167,99 @@ export function FeedPanel() {
 
   return (
     <div className="ig-shell" aria-label="Стрічка Miston">
-      <header className="ig-header">
-        <div className="ig-header-inner">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <Logo compact size={32} />
-            <div className="min-w-0">
-              <h1 className="text-lg font-bold tracking-tight sm:text-xl">Стрічка</h1>
-              <p className="hidden text-xs text-ios-secondary sm:block">Думки, фото й настрій спільноти</p>
+      <FeedSidebar
+        filter={filter}
+        onFilter={selectFilter}
+        onCompose={() => { setChatOpen(false); setComposeOpen(true); }}
+        onChat={() => setChatOpen((value) => !value)}
+        chatOpen={chatOpen}
+      />
+
+      <div className={`ig-main ${chatOpen ? 'hidden md:flex' : 'flex'}`}>
+        <header className="ig-header">
+          <div className="ig-header-inner">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <Logo compact size={32} />
+              <div className="min-w-0">
+                <h1 className="text-lg font-bold tracking-tight sm:text-xl">Стрічка</h1>
+                <p className="hidden text-xs text-ios-secondary sm:block">Думки, фото й настрій спільноти</p>
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <button type="button" className="ig-action md:hidden" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Світла тема' : 'Темна тема'} title={theme === 'dark' ? 'Світла тема' : 'Темна тема'}>
+                {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
+              </button>
+              <button type="button" className="ig-action hidden sm:flex md:hidden" onClick={() => void logout()} aria-label="Вийти" title="Вийти">
+                <LogOut size={19} />
+              </button>
+              <button type="button" className="primary-btn ml-1 shrink-0 px-3 sm:px-4 md:hidden" onClick={() => setComposeOpen(true)}><Plus size={17} /> <span className="hidden sm:inline">Новий пост</span></button>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <button type="button" className="ig-action" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Світла тема' : 'Темна тема'} title={theme === 'dark' ? 'Світла тема' : 'Темна тема'}>
-              {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
-            </button>
-            <button type="button" className="ig-action hidden sm:flex" onClick={() => void logout()} aria-label="Вийти" title="Вийти">
-              <LogOut size={19} />
-            </button>
-            <button type="button" className="primary-btn ml-1 shrink-0 px-3 sm:px-4" onClick={() => setComposeOpen(true)}><Plus size={17} /> <span className="hidden sm:inline">Новий пост</span></button>
+        </header>
+
+        <div ref={scrollRef} className="subtle-scrollbar ig-scroll">
+          <div className="ig-column">
+            {fresh && (
+              <button type="button" onClick={refresh} className="ig-fresh-pill" aria-label="Показати нові пости">
+                <span aria-hidden="true">↑</span> Нові пости
+              </button>
+            )}
+
+            {loading ? (
+              <>
+                <div className="ig-card h-36 animate-pulse rounded-[26px] border" aria-hidden="true" />
+                {[0, 1].map((item) => <div key={item} className="ig-card h-56 animate-pulse rounded-[26px] border" aria-hidden="true" />)}
+                <p className="text-center text-xs text-ios-secondary" role="status">Завантажуємо стрічку…</p>
+              </>
+            ) : error && posts.length === 0 ? (
+              <div className="ig-card rounded-[26px] border">
+                <EmptyState icon={LayoutGrid} title="Стрічку не вдалося завантажити" description={error} action={<button type="button" className="primary-btn" onClick={refresh}>Спробувати ще раз</button>} />
+              </div>
+            ) : (
+              <>
+                {posts.length === 0 ? (
+                  <div className="ig-card rounded-[26px] border">
+                    <EmptyState icon={filter === 'saved' ? Bookmark : LayoutGrid} title={emptyTitle} description={emptyText} action={filter === 'saved'
+                      ? <button type="button" className="primary-btn" onClick={() => selectFilter('all')}>Перейти до стрічки</button>
+                      : <button type="button" className="primary-btn" onClick={() => setComposeOpen(true)}><Plus size={16} /> Створити пост</button>} />
+                  </div>
+                ) : (
+                  posts.map((post) => (
+                    <PostCard
+                      key={post.id}
+                      post={post}
+                      currentUserId={currentUser.id}
+                      onReact={react}
+                      onVote={vote}
+                      onSave={save}
+                      onComments={setCommentsPost}
+                      onRemove={(id) => void removePost(id)}
+                    />
+                  ))
+                )}
+                {loadingMore && <Spinner label="Завантажуємо ще…" className="py-4" />}
+                <div ref={sentinelRef} className="h-px" aria-hidden="true" />
+              </>
+            )}
           </div>
-        </div>
-        <div className="subtle-scrollbar ig-chips" role="tablist" aria-label="Фільтри стрічки">
-          {filters.map(({ value, label, icon: Icon }) => (
-            <button
-              type="button"
-              key={value}
-              role="tab"
-              aria-selected={filter === value}
-              onClick={() => setFilter(value)}
-              className={`ig-chip ${filter === value ? 'ig-chip--active' : 'ig-chip--idle'}`}
-            >
-              <Icon size={14} fill={value === 'saved' && filter === value ? 'currentColor' : 'none'} /> {label}
-            </button>
-          ))}
-        </div>
-      </header>
-
-      <div ref={scrollRef} className="subtle-scrollbar ig-scroll">
-        <div className="ig-column">
-          {fresh && (
-            <button type="button" onClick={refresh} className="ig-fresh-pill" aria-label="Показати нові пости">
-              <span aria-hidden="true">↑</span> Нові пости
-            </button>
-          )}
-
-          {loading ? (
-            <>
-              <div className="ig-card h-36 animate-pulse rounded-[26px] border" aria-hidden="true" />
-              {[0, 1].map((item) => <div key={item} className="ig-card h-56 animate-pulse rounded-[26px] border" aria-hidden="true" />)}
-              <p className="text-center text-xs text-ios-secondary" role="status">Завантажуємо стрічку…</p>
-            </>
-          ) : error && posts.length === 0 ? (
-            <div className="ig-card rounded-[26px] border">
-              <EmptyState icon={LayoutGrid} title="Стрічку не вдалося завантажити" description={error} action={<button type="button" className="primary-btn" onClick={refresh}>Спробувати ще раз</button>} />
-            </div>
-          ) : (
-            <>
-              {posts.length === 0 ? (
-                <div className="ig-card rounded-[26px] border">
-                  <EmptyState icon={filter === 'saved' ? Bookmark : LayoutGrid} title={emptyTitle} description={emptyText} action={filter === 'saved'
-                    ? <button type="button" className="primary-btn" onClick={() => setFilter('all')}>Перейти до стрічки</button>
-                    : <button type="button" className="primary-btn" onClick={() => setComposeOpen(true)}><Plus size={16} /> Створити пост</button>} />
-                </div>
-              ) : (
-                posts.map((post) => (
-                  <PostCard
-                    key={post.id}
-                    post={post}
-                    currentUserId={currentUser.id}
-                    onReact={react}
-                    onVote={vote}
-                    onSave={save}
-                    onComments={setCommentsPost}
-                    onRemove={(id) => void removePost(id)}
-                  />
-                ))
-              )}
-              {loadingMore && <Spinner label="Завантажуємо ще…" className="py-4" />}
-              <div ref={sentinelRef} className="h-px" aria-hidden="true" />
-            </>
-          )}
         </div>
       </div>
 
+      {chatOpen && (
+        <div className="ig-dm-layer">
+          <FeedDmView onBack={() => setChatOpen(false)} />
+        </div>
+      )}
+
       <nav className="ig-bottom-nav md:hidden" aria-label="Навігація">
-        <button type="button" className="ig-nav-item" onClick={() => scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })} aria-label="Нагору стрічки">
+        <button type="button" className="ig-nav-item" onClick={() => { setChatOpen(false); scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); }} aria-label="Нагору стрічки">
           <LayoutGrid size={21} /><span>Стрічка</span>
         </button>
         <button type="button" className="ig-nav-item ig-nav-item--primary" onClick={() => setComposeOpen(true)} aria-label="Новий пост">
           <span className="ig-nav-compose"><Plus size={23} /></span><span>Створити</span>
         </button>
-        <button type="button" className="ig-nav-item" onClick={() => void logout()} aria-label="Вийти">
-          <LogOut size={21} /><span>Вийти</span>
+        <button type="button" className={`ig-nav-item ${chatOpen ? 'text-ios-blue' : ''}`} onClick={() => setChatOpen((value) => !value)} aria-label="Повідомлення">
+          <MessageCircle size={21} /><span>Чат</span>
         </button>
       </nav>
 

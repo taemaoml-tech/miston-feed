@@ -1,9 +1,8 @@
 import { BarChart3, ImagePlus, LoaderCircle, Plus, Send, Video, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { api } from '../../api';
-import { assetUrl } from '../../api/client';
-import type { FeedCategory, FeedDraft, FeedPost } from '../../types/feed';
+import type { FeedCategory, FeedMediaDraft } from '../../types/feed';
 import { uploadFeedVideo } from '../../utils/videoUpload';
 import { errorMessage, formatDuration } from '../../utils/format';
 import { Modal } from '../common/Modal';
@@ -18,162 +17,184 @@ const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 const DIRECT_UPLOAD_THRESHOLD = 25 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 2 * 1024 * 1024 * 1024;
 const SHORT_VIDEO_MAX_SECONDS = 60;
+const MAX_MEDIA = 10;
+
+interface LocalAttachment {
+  id: string;
+  type: 'image' | 'video';
+  file: File;
+  preview: string;
+  duration: number | null;
+  probing: boolean;
+}
+
+function nextId() {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+}
+
+/** Браузер сам визначає тривалість; понад 60 с сервер поставить у «Довгі». */
+function probeVideo(url: string): Promise<number | null> {
+  return new Promise((resolve) => {
+    const probe = document.createElement('video');
+    let done = false;
+    const finish = (value: number | null) => {
+      if (done) return;
+      done = true;
+      probe.onloadedmetadata = null;
+      probe.onerror = null;
+      probe.removeAttribute('src');
+      probe.load();
+      resolve(value);
+    };
+    probe.preload = 'metadata';
+    probe.onloadedmetadata = () => finish(Number.isFinite(probe.duration) && probe.duration > 0 ? Math.round(probe.duration) : null);
+    probe.onerror = () => finish(null);
+    probe.src = url;
+    window.setTimeout(() => finish(null), 6000);
+  });
+}
 
 export function ComposePostModal({ open, onClose, onCreated, initialCategory = 'general' }: {
   open: boolean;
   onClose: () => void;
-  onCreated: (post: FeedPost) => void;
+  onCreated: (post: import('../../types/feed').FeedPost) => void;
   initialCategory?: FeedCategory;
 }) {
   const [text, setText] = useState('');
   const [category, setCategory] = useState<FeedCategory>(initialCategory);
-  const [image, setImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [video, setVideo] = useState<File | null>(null);
-  const [videoPreview, setVideoPreview] = useState<string | null>(null);
-  const [videoDuration, setVideoDuration] = useState<number | null>(null);
-  const [videoProbing, setVideoProbing] = useState(false);
+  const [attachments, setAttachments] = useState<LocalAttachment[]>([]);
   const [pollEnabled, setPollEnabled] = useState(false);
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState(['', '']);
   const [busy, setBusy] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadLabel, setUploadLabel] = useState('');
   const [error, setError] = useState('');
+  const previewUrls = useRef<Set<string>>(new Set());
 
-  useEffect(() => {
-    if (!open) return;
+  function track(url: string) {
+    previewUrls.current.add(url);
+    return url;
+  }
+
+  function revoke(url: string) {
+    if (!previewUrls.current.delete(url)) return;
+    URL.revokeObjectURL(url);
+  }
+
+  function reset() {
+    for (const url of previewUrls.current) URL.revokeObjectURL(url);
+    previewUrls.current.clear();
     setText('');
     setCategory(initialCategory);
-    setImage(null);
-    setImagePreview(null);
-    setVideo(null);
-    setVideoPreview(null);
-    setVideoDuration(null);
-    setVideoProbing(false);
+    setAttachments([]);
     setPollEnabled(initialCategory === 'polls');
     setQuestion('');
     setOptions(['', '']);
     setUploadProgress(null);
+    setUploadLabel('');
     setError('');
+  }
+
+  useEffect(() => {
+    if (open) reset();
+    // initialCategory змінюється разом з відкриттям модалки.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialCategory]);
 
-  useEffect(() => () => { if (imagePreview) URL.revokeObjectURL(imagePreview); }, [imagePreview]);
-  useEffect(() => () => { if (videoPreview) URL.revokeObjectURL(videoPreview); }, [videoPreview]);
+  useEffect(() => () => {
+    for (const url of previewUrls.current) URL.revokeObjectURL(url);
+    previewUrls.current.clear();
+  }, []);
 
-  function clearImage() {
-    if (imagePreview) URL.revokeObjectURL(imagePreview);
-    setImage(null);
-    setImagePreview(null);
-  }
-
-  function clearVideo() {
-    if (videoPreview) URL.revokeObjectURL(videoPreview);
-    setVideo(null);
-    setVideoPreview(null);
-    setVideoDuration(null);
-    setVideoProbing(false);
-  }
-
-  function pickImage(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) { setError('Можна додати лише зображення.'); return; }
-    if (file.size > MAX_IMAGE_BYTES) { setError('Зображення має бути не більше 25 МБ.'); return; }
-    clearVideo();
-    clearImage();
-    setImage(file);
-    setImagePreview(URL.createObjectURL(file));
-    setError('');
+  async function addFiles(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
     event.target.value = '';
+    if (!files.length) return;
+    setError('');
+    const accepted: LocalAttachment[] = [];
+    for (const file of files) {
+      if (attachments.length + accepted.length >= MAX_MEDIA) {
+        setError(`Можна додати не більше ${MAX_MEDIA} фото й відео в один пост.`);
+        break;
+      }
+      const isImage = file.type.startsWith('image/');
+      const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov)$/i.test(file.name);
+      if (!isImage && !isVideo) {
+        setError('Підтримуються лише фото та відео MP4, WebM і MOV.');
+        continue;
+      }
+      if (isImage && file.size > MAX_IMAGE_BYTES) {
+        setError('Кожне зображення має бути не більше 25 МБ.');
+        continue;
+      }
+      if (isVideo && file.size > MAX_VIDEO_BYTES) {
+        setError('Кожне відео має бути не більше 2 ГБ.');
+        continue;
+      }
+      const preview = track(URL.createObjectURL(file));
+      accepted.push({
+        id: nextId(),
+        type: isImage ? 'image' : 'video',
+        file,
+        preview,
+        duration: null,
+        probing: isVideo,
+      });
+    }
+    if (!accepted.length) return;
+    setAttachments((current) => [...current, ...accepted]);
+    for (const item of accepted.filter((item) => item.type === 'video')) {
+      const duration = await probeVideo(item.preview);
+      setAttachments((current) => current.map((entry) => entry.id === item.id ? { ...entry, duration, probing: false } : entry));
+    }
   }
 
-  function pickVideo(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov)$/i.test(file.name);
-    if (!isVideo) { setError('Можна додати лише відео MP4, WebM або MOV.'); return; }
-    if (file.size > MAX_VIDEO_BYTES) { setError('Відео має бути не більше 2 ГБ.'); return; }
-
-    clearImage();
-    clearVideo();
-    const url = URL.createObjectURL(file);
-    setVideo(file);
-    setVideoPreview(url);
-    setVideoDuration(null);
-    setVideoProbing(true);
-    setError('');
-
-    // Браузер сам визначає тривалість; понад 60 с сервер поставить у «Довгі».
-    const probe = document.createElement('video');
-    probe.preload = 'metadata';
-    const finish = () => {
-      probe.onloadedmetadata = null;
-      probe.onerror = null;
-      probe.removeAttribute('src');
-      probe.load();
-    };
-    probe.onloadedmetadata = () => {
-      setVideoDuration(Number.isFinite(probe.duration) && probe.duration > 0 ? Math.round(probe.duration) : null);
-      setVideoProbing(false);
-      finish();
-    };
-    probe.onerror = () => {
-      setVideoDuration(null);
-      setVideoProbing(false);
-      finish();
-    };
-    probe.src = url;
-    window.setTimeout(() => setVideoProbing(false), 6000);
-    event.target.value = '';
+  function removeAttachment(id: string) {
+    setAttachments((current) => {
+      const target = current.find((item) => item.id === id);
+      if (target) revoke(target.preview);
+      return current.filter((item) => item.id !== id);
+    });
   }
 
   const filledOptions = options.map((option) => option.trim()).filter(Boolean);
   const poll = pollEnabled && question.trim() && filledOptions.length >= 2
     ? { question: question.trim(), options: filledOptions }
     : null;
-  const canPublish = Boolean(text.trim() || image || video || poll) && !busy && !videoProbing;
+  const probing = attachments.some((item) => item.probing);
+  const canPublish = Boolean(text.trim() || attachments.length || poll) && !busy && !probing;
 
   async function publish(event: FormEvent) {
     event.preventDefault();
     if (!canPublish) return;
     setBusy(true);
     setError('');
-    const draft: FeedDraft = {
-      text: text.trim(),
-      category: poll ? 'polls' : category,
-      image,
-      video,
-      videoDuration,
-      poll,
-    };
     try {
-      if (video && video.size > DIRECT_UPLOAD_THRESHOLD) {
-        setUploadProgress(0);
-        draft.videoUrl = await uploadFeedVideo(video, (fraction) => setUploadProgress(fraction));
-        draft.video = null;
+      const media: FeedMediaDraft[] = [];
+      for (const [index, item] of attachments.entries()) {
+        if (item.type === 'video' && item.file.size > DIRECT_UPLOAD_THRESHOLD) {
+          setUploadLabel(`Відео ${index + 1} з ${attachments.length}`);
+          setUploadProgress(0);
+          const url = await uploadFeedVideo(item.file, (fraction) => setUploadProgress(fraction));
+          media.push({ type: 'video', url, duration: item.duration });
+        } else {
+          media.push({ type: item.type, url: '', file: item.file, duration: item.duration });
+        }
       }
-      const { post } = await api.feed.create(draft);
+      const { post } = await api.feed.create({ text: text.trim(), category: poll ? 'polls' : category, media, poll });
       onCreated(post);
       onClose();
     } catch (cause) { setError(errorMessage(cause)); }
-    finally { setBusy(false); setUploadProgress(null); }
+    finally { setBusy(false); setUploadProgress(null); setUploadLabel(''); }
   }
-
-  const preview = imagePreview ? assetUrl(imagePreview) : null;
-  const videoHint = videoProbing
-    ? 'Визначаємо тривалість…'
-    : videoDuration == null
-      ? 'Тривалість невідома — відео потрапить у «Короткі»'
-      : videoDuration > SHORT_VIDEO_MAX_SECONDS
-        ? `${formatDuration(videoDuration)} · довге — лише у вкладці «Довгі»`
-        : `${formatDuration(videoDuration)} · коротке — у загальній стрічці`;
 
   return (
     <Modal open={open} onClose={onClose} title="Новий пост" description="Поділіться тим, що вас надихнуло">
       <form onSubmit={publish}>
         <label className="block">
           <span className="field-label">Що нового?</span>
-          <textarea className="text-input min-h-28 resize-y" value={text} onChange={(event) => setText(event.target.value)} maxLength={2000} placeholder="Коротка думка, новина або невеликий челендж…" aria-label="Текст поста" />
+          <textarea className="text-input min-h-24 resize-y" value={text} onChange={(event) => setText(event.target.value)} maxLength={2000} placeholder="Коротка думка, новина або невеликий челендж…" aria-label="Текст поста" />
           <span className="mt-1 block text-right text-[11px] text-ios-secondary">{text.length}/2000</span>
         </label>
 
@@ -188,34 +209,36 @@ export function ComposePostModal({ open, onClose, onCreated, initialCategory = '
 
         <div className="mt-4 flex flex-wrap gap-2">
           <label className="secondary-btn cursor-pointer">
-            <ImagePlus size={16} /> {image ? 'Змінити фото' : 'Додати фото'}
-            <input type="file" accept="image/*" className="hidden" onChange={pickImage} />
+            <ImagePlus size={16} /> Додати фото
+            <input type="file" accept="image/*" multiple className="hidden" onChange={addFiles} />
           </label>
           <label className="secondary-btn cursor-pointer">
-            <Video size={16} /> {video ? 'Змінити відео' : 'Додати відео'}
-            <input type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden" onChange={pickVideo} />
+            <Video size={16} /> Додати відео
+            <input type="file" accept="video/mp4,video/webm,video/quicktime" multiple className="hidden" onChange={addFiles} />
           </label>
           <button type="button" className={`secondary-btn ${pollEnabled ? 'border-ios-blue/40 bg-ios-blue/10 text-ios-blue' : ''}`} onClick={() => setPollEnabled((value) => !value)} aria-pressed={pollEnabled}>
             <BarChart3 size={16} /> Опитування
           </button>
         </div>
+        <p className="mt-2 text-[11px] text-ios-secondary">До {MAX_MEDIA} медіа в одному пості · фото до 25 МБ · відео до 2 ГБ</p>
 
-        {preview && (
-          <div className="relative mt-3">
-            <img src={preview} alt="Попередній перегляд зображення" className="feed-image" />
-            <button type="button" onClick={clearImage} className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-white" aria-label="Прибрати зображення"><X size={16} /></button>
-          </div>
-        )}
-
-        {videoPreview && (
-          <div className="mt-3">
-            <div className="relative">
-              <video src={videoPreview} controls playsInline preload="metadata" className="feed-video" aria-label="Попередній перегляд відео" />
-              <button type="button" onClick={clearVideo} className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-white" aria-label="Прибрати відео"><X size={16} /></button>
-            </div>
-            <p className="mt-2 text-[11px] text-ios-secondary" aria-live="polite">
-              {videoHint}{video && video.size > DIRECT_UPLOAD_THRESHOLD ? ' · велике відео завантажується шматками' : ''}
-            </p>
+        {attachments.length > 0 && (
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {attachments.map((item) => (
+              <div key={item.id} className="relative overflow-hidden rounded-2xl border border-ios-separator/15 bg-ios-fill/5">
+                {item.type === 'image' ? (
+                  <img src={item.preview} alt="Попередній перегляд зображення" className="h-28 w-full object-cover" />
+                ) : (
+                  <video src={item.preview} preload="metadata" className="h-28 w-full object-cover" aria-label="Попередній перегляд відео" />
+                )}
+                <button type="button" onClick={() => removeAttachment(item.id)} className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white" aria-label="Прибрати вкладення"><X size={15} /></button>
+                <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white">
+                  {item.type === 'video'
+                    ? item.probing ? 'тривалість…' : item.duration != null ? `${formatDuration(item.duration)}${item.duration > SHORT_VIDEO_MAX_SECONDS ? ' · довге' : ''}` : 'відео'
+                    : 'фото'}
+                </span>
+              </div>
+            ))}
           </div>
         )}
 
@@ -242,7 +265,7 @@ export function ComposePostModal({ open, onClose, onCreated, initialCategory = '
         {uploadProgress !== null && (
           <div className="mt-3" aria-live="polite">
             <div className="flex justify-between text-[11px] text-ios-secondary">
-              <span>Завантажуємо відео…</span>
+              <span>Завантажуємо {uploadLabel || 'медіа'}…</span>
               <span>{Math.round(uploadProgress * 100)}%</span>
             </div>
             <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">

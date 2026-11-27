@@ -292,6 +292,35 @@ html.android.dark .ios-glass {
 .ig-shell {
   @apply relative flex h-full min-h-0 flex-col bg-ios-bg;
 }
+@media (min-width: 768px) {
+  .ig-shell { @apply flex-row; }
+}
+
+.ig-sidebar {
+  @apply hidden h-full w-[248px] shrink-0 flex-col border-r border-ios-separator/10 bg-ios-glass/70 px-3 pb-3 pt-4 backdrop-blur-xl md:flex;
+}
+.ig-sidebar-brand { @apply mb-5 flex items-center gap-2 px-2; }
+.ig-sidebar-compose { @apply mb-4 flex w-full justify-center py-2.5; }
+.ig-sidebar-nav { @apply flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto; }
+.ig-sidebar-item {
+  @apply flex min-h-11 items-center gap-3 rounded-2xl px-3 text-sm font-semibold text-ios-secondary transition;
+}
+.ig-sidebar-item:hover { @apply bg-ios-fill/10 text-ios-label; }
+.ig-sidebar-item--active {
+  @apply bg-ios-blue/10 text-ios-blue;
+  box-shadow: inset 3px 0 0 rgb(var(--ios-blue));
+}
+.ig-sidebar-footer { @apply mt-auto space-y-1 border-t border-ios-separator/10 pt-2; }
+.ig-sidebar-user {
+  @apply flex items-center gap-2 rounded-2xl bg-ios-fill/[0.07] px-2 py-2;
+}
+
+.ig-main { @apply flex h-full min-h-0 min-w-0 flex-1 flex-col; }
+.ig-dm-layer { @apply absolute inset-0 z-40 bg-ios-bg md:static md:z-auto; }
+.ig-dm-shell { @apply flex h-full min-h-0 overflow-hidden bg-ios-bg text-ios-label; }
+@media (min-width: 768px) {
+  .ig-dm-layer { @apply min-w-0 flex-1; }
+}
 
 .ig-header {
   @apply shrink-0 border-b border-ios-separator/10;
@@ -357,6 +386,22 @@ html.android.dark .ios-glass {
 .ig-video-duration {
   @apply absolute bottom-3 right-3 rounded-full bg-black/65 px-2 py-1 text-[11px] font-semibold text-white;
 }
+
+.ig-media-stage { @apply relative; }
+.ig-media-stage .ig-video-wrap { @apply m-0; }
+.ig-media-arrow {
+  @apply absolute top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white opacity-90 transition hover:bg-black/70;
+}
+.ig-media-arrow--left { @apply left-2; }
+.ig-media-arrow--right { @apply right-2; }
+.ig-media-count {
+  @apply absolute right-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white;
+}
+.ig-media-dots {
+  @apply absolute inset-x-0 bottom-2 flex items-center justify-center gap-1.5;
+}
+.ig-media-dots span { @apply h-1.5 w-1.5 rounded-full bg-white/55 transition-all; }
+.ig-media-dots span.is-active { @apply h-2 w-2 bg-white; }
 
 .feed-image, .feed-video {
   @apply block w-full rounded-2xl border border-ios-separator/10;
